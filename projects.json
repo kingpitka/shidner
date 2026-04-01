@@ -1,0 +1,12 @@
+[
+  {
+    "slug": "hello-world",
+    "title": "Hello World",
+    "description": "The obligatory first project. A simple interactive demo to test that the site is wired up correctly.",
+    "tags": ["demo", "interactive"],
+    "date": "2025",
+    "status": "Live",
+    "embed_url": "",
+    "long_description": "Every lab needs a starting point. This is it."
+  }
+]
