@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Topo Trail Map</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0d0d0d;
+    --paper: #f5f0e8;
+    --accent-1: #ff3c00;
+    --accent-2: #0057ff;
+    --accent-3: #c8ff00;
+    --accent-4: #ff0090;
+    --trail-open: #2a9d3f;
+    --trail-caution: #f0a500;
+    --trail-closed: #cc2200;
+    --trail-unmaintained: #7a6a55;
+    --trail-proposed: #0057ff;
+    --panel-w: 320px;
+    --topo-1: #c9bfa8;
+    --topo-2: #b8ad96;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--paper);
+    color: var(--ink);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.25rem;
+    height: 52px;
+    border-bottom: 2px solid var(--ink);
+    background: var(--paper);
+    z-index: 100;
+    flex-shrink: 0;
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+  }
+  .logo span { color: var(--accent-1); }
+  .header-tools {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .tool-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border: 1.5px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .tool-btn:hover { background: var(--ink); color: var(--paper); }
+  .tool-btn.active { background: var(--ink); color: var(--paper); }
+  .tool-btn.draw-active {
+    background: var(--accent-1);
+    border-color: var(--accent-1);
+    color: white;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  .app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── MAP CANVAS ── */
+  .map-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    cursor: crosshair;
+  }
+  .map-wrap.pan-mode { cursor: grab; }
+  .map-wrap.pan-mode:active { cursor: grabbing; }
+  .map-wrap.select-mode { cursor: default; }
+  #map-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── SIDE PANEL ── */
+  .side-panel {
+    width: var(--panel-w);
+    border-left: 2px solid var(--ink);
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .panel-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--ink);
+    flex-shrink: 0;
+  }
+  .tab-btn {
+    flex: 1;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 10px 4px;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    border-right: 1px solid var(--ink);
+    transition: background 0.1s;
+  }
+  .tab-btn:last-child { border-right: none; }
+  .tab-btn.active { background: var(--ink); color: var(--paper); }
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+
+  /* ── LEGEND ── */
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+  }
+  .legend-line {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .section-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+    margin-top: 4px;
+  }
+  .divider { border: none; border-top: 1px solid rgba(13,13,13,0.2); margin: 12px 0; }
+
+  /* ── TRAIL LIST ── */
+  .trail-card {
+    border: 1.5px solid var(--ink);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.12s;
+    position: relative;
+  }
+  .trail-card:hover { background: rgba(13,13,13,0.05); }
+  .trail-card.selected { background: var(--ink); color: var(--paper); }
+  .trail-card-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 0.05em;
+  }
+  .trail-card-meta {
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    margin-top: 3px;
+    opacity: 0.7;
+  }
+  .trail-status-dot {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  /* ── ADD TRAIL FORM ── */
+  .form-field {
+    margin-bottom: 12px;
+  }
+  .form-label {
+    display: block;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    opacity: 0.7;
+  }
+  .form-input, .form-select, .form-textarea {
+    width: 100%;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 7px 10px;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink);
+    outline: none;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus {
+    border-color: var(--accent-1);
+  }
+  .form-textarea { resize: vertical; min-height: 70px; }
+  .btn-primary {
+    width: 100%;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    padding: 10px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.12s;
+    margin-top: 4px;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-danger {
+    width: 100%;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px;
+    background: transparent;
+    color: var(--trail-closed);
+    border: 1.5px solid var(--trail-closed);
+    cursor: pointer;
+    margin-top: 6px;
+    transition: background 0.12s, color 0.12s;
+  }
+  .btn-danger:hover { background: var(--trail-closed); color: white; }
+
+  /* ── REPORT PANEL ── */
+  .report-wrap {
+    font-size: 0.72rem;
+    line-height: 1.7;
+    letter-spacing: 0.02em;
+  }
+  .report-wrap h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .report-status-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    margin-bottom: 12px;
+    color: white;
+    border-radius: 2px;
+  }
+  .report-section-title {
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.5;
+    margin-top: 12px;
+    margin-bottom: 4px;
+    border-top: 1px solid rgba(13,13,13,0.15);
+    padding-top: 10px;
+  }
+  .report-body { opacity: 0.85; }
+  .report-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    opacity: 0.6;
+    padding: 20px 0;
+  }
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--ink);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── DRAW STATUS BAR ── */
+  .status-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .status-bar.visible { opacity: 1; }
+
+  /* ── COORDINATE DISPLAY ── */
+  .coord-display {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 24px 0;
+    opacity: 0.4;
+    font-size: 0.72rem;
+    line-height: 1.8;
+  }
+  .empty-state-icon {
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  /* scrollbar */
+  .panel-content::-webkit-scrollbar { width: 4px; }
+  .panel-content::-webkit-scrollbar-track { background: transparent; }
+  .panel-content::-webkit-scrollbar-thumb { background: rgba(13,13,13,0.2); border-radius: 2px; }
+
+  /* ── POINT POPUP ── */
+  .map-tooltip {
+    position: absolute;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    padding: 5px 10px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+    z-index: 50;
+  }
+  .map-tooltip.visible { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">TOPO<span>·</span>TRAILS</div>
+  <div class="header-tools">
+    <button class="tool-btn active" id="btn-select" onclick="setMode('select')">Select</button>
+    <button class="tool-btn" id="btn-draw" onclick="setMode('draw')">+ Draw Trail</button>
+    <button class="tool-btn" id="btn-pan" onclick="setMode('pan')">Pan</button>
+  </div>
+</header>
+
+<div class="app-body">
+  <div class="map-wrap select-mode" id="map-wrap">
+    <canvas id="map-canvas"></canvas>
+    <div class="status-bar" id="status-bar">Click to place points · Double-click to finish</div>
+    <div class="coord-display" id="coord-display"></div>
+    <div class="map-tooltip" id="map-tooltip"></div>
+  </div>
+
+  <aside class="side-panel">
+    <div class="panel-tabs">
+      <button class="tab-btn active" id="tab-trails" onclick="showTab('trails')">Trails</button>
+      <button class="tab-btn" id="tab-add" onclick="showTab('add')">Add</button>
+      <button class="tab-btn" id="tab-legend" onclick="showTab('legend')">Legend</button>
+      <button class="tab-btn" id="tab-report" onclick="showTab('report')">Report</button>
+    </div>
+    <div class="panel-content" id="panel-content">
+      <!-- populated by JS -->
+    </div>
+  </aside>
+</div>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────
+const STATUS_COLORS = {
+  open:        '#2a9d3f',
+  caution:     '#f0a500',
+  closed:      '#cc2200',
+  unmaintained:'#7a6a55',
+  proposed:    '#0057ff'
+};
+const STATUS_LABELS = {
+  open: 'Open', caution: 'Caution', closed: 'Closed',
+  unmaintained: 'Unmaintained', proposed: 'Proposed'
+};
+
+let trails = [
+  {
+    id: 't1', name: 'Ridge Loop', status: 'open',
+    difficulty: 'Moderate', length: '4.2 mi', gain: '820 ft',
+    notes: 'Well-maintained. Good views at the summit.',
+    points: [[120,180],[180,150],[260,130],[340,160],[380,210],[320,260],[240,270],[160,240],[120,180]]
+  },
+  {
+    id: 't2', name: 'Creek Connector', status: 'caution',
+    difficulty: 'Easy', length: '1.8 mi', gain: '120 ft',
+    notes: 'Seasonal flooding near mile marker 1. Use caution May–June.',
+    points: [[260,130],[290,190],[310,250],[340,300]]
+  },
+  {
+    id: 't3', name: 'Summit Spur', status: 'closed',
+    difficulty: 'Strenuous', length: '2.1 mi', gain: '1,100 ft',
+    notes: 'Closed for trail restoration. Reopen expected August.',
+    points: [[340,160],[400,120],[440,80],[460,50]]
+  },
+  {
+    id: 't4', name: 'Old Mine Path', status: 'unmaintained',
+    difficulty: 'Difficult', length: '3.6 mi', gain: '640 ft',
+    notes: 'Historic route. Overgrown, downed trees reported.',
+    points: [[120,180],[90,230],[70,290],[60,350],[80,410]]
+  }
+];
+
+let selectedTrail = null;
+let mode = 'select'; // select | draw | pan
+let drawPoints = [];
+let isDrawing = false;
+let activeTab = 'trails';
+
+// pan state
+let panStart = null;
+let offsetX = 0, offsetY = 0;
+let targetOffsetX = 0, targetOffsetY = 0;
+
+// ── CANVAS SETUP ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('map-canvas');
+const ctx = canvas.getContext('2d');
+const mapWrap = document.getElementById('map-wrap');
+
+function resize() {
+  canvas.width = mapWrap.clientWidth;
+  canvas.height = mapWrap.clientHeight;
+  render();
+}
+window.addEventListener('resize', resize);
+
+// ── TOPO GENERATION ───────────────────────────────────────────────────────
+let topoLines = null;
+function generateTopo(w, h) {
+  topoLines = [];
+  // Generate organic closed contour curves using layered noise
+  const seed = 42;
+  function noise(x, y, freq) {
+    const a = Math.sin(x * freq * 1.1 + seed) * Math.cos(y * freq * 0.9);
+    const b = Math.sin(x * freq * 0.7 - y * freq * 1.3 + seed * 0.5);
+    const c = Math.cos((x + y) * freq * 0.6 + seed * 0.3);
+    return (a + b + c) / 3;
+  }
+  function elevation(x, y) {
+    const nx = x / w, ny = y / h;
+    return noise(nx, ny, 3.1) * 0.5
+         + noise(nx, ny, 6.3) * 0.3
+         + noise(nx, ny, 12.7) * 0.2;
+  }
+
+  const levels = [-0.6,-0.45,-0.3,-0.15,0,0.1,0.2,0.3,0.4,0.5,0.6];
+  const step = 6;
+
+  levels.forEach((level, li) => {
+    const lines = [];
+    for (let y = step; y < h - step; y += step) {
+      let start = null;
+      for (let x = 0; x < w; x += 2) {
+        const e = elevation(x, y);
+        const above = e > level;
+        const prev = x > 0 ? elevation(x - 2, y) > level : above;
+        if (above !== prev) {
+          const pt = [x, y];
+          if (start === null) { start = pt; }
+          else {
+            lines.push([start, pt]);
+            start = pt;
+          }
+        }
+      }
+    }
+    topoLines.push({ level, lines });
+  });
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────
+function render() {
+  const w = canvas.width, h = canvas.height;
+  if (!topoLines) generateTopo(w, h);
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+
+  // Background
+  ctx.fillStyle = '#f5f0e8';
+  ctx.fillRect(-offsetX, -offsetY, w, h);
+
+  // Topo lines
+  topoLines.forEach(({ level, lines }) => {
+    const t = (level + 0.6) / 1.2;
+    const major = Math.abs(Math.round(level * 20) % 5) === 0;
+    ctx.strokeStyle = major ? 'rgba(170,155,130,0.55)' : 'rgba(190,175,150,0.35)';
+    ctx.lineWidth = major ? 1.2 : 0.6;
+    lines.forEach(([a, b]) => {
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.stroke();
+    });
+  });
+
+  // Grid dots
+  ctx.fillStyle = 'rgba(13,13,13,0.06)';
+  for (let x = 40; x < w + Math.abs(offsetX) + 40; x += 40) {
+    for (let y = 40; y < h + Math.abs(offsetY) + 40; y += 40) {
+      ctx.beginPath();
+      ctx.arc(x - (offsetX % 40), y - (offsetY % 40), 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Trails
+  trails.forEach(trail => {
+    drawTrail(trail, trail.id === (selectedTrail?.id));
+  });
+
+  // In-progress drawing
+  if (isDrawing && drawPoints.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(drawPoints[0][0], drawPoints[0][1]);
+    for (let i = 1; i < drawPoints.length; i++) {
+      ctx.lineTo(drawPoints[i][0], drawPoints[i][1]);
+    }
+    ctx.strokeStyle = '#0057ff';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw points
+    drawPoints.forEach(([x, y]) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#0057ff';
+      ctx.fill();
+    });
+  }
+
+  ctx.restore();
+}
+
+function drawTrail(trail, selected) {
+  if (trail.points.length < 2) return;
+  const color = STATUS_COLORS[trail.status] || '#888';
+  const lw = selected ? 5 : 3;
+
+  // Shadow for selected
+  if (selected) {
+    ctx.beginPath();
+    ctx.moveTo(trail.points[0][0], trail.points[0][1]);
+    for (let i = 1; i < trail.points.length; i++) {
+      ctx.lineTo(trail.points[i][0], trail.points[i][1]);
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = lw + 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+
+  // Trail line
+  ctx.beginPath();
+  ctx.moveTo(trail.points[0][0], trail.points[0][1]);
+  for (let i = 1; i < trail.points.length; i++) {
+    ctx.lineTo(trail.points[i][0], trail.points[i][1]);
+  }
+  if (trail.status === 'unmaintained') {
+    ctx.setLineDash([10, 5]);
+  } else if (trail.status === 'proposed') {
+    ctx.setLineDash([4, 4]);
+  } else {
+    ctx.setLineDash([]);
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Start/end dots
+  [[trail.points[0]], [trail.points[trail.points.length - 1]]].forEach(([pt]) => {
+    ctx.beginPath();
+    ctx.arc(pt[0], pt[1], 5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#f5f0e8';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  // Label
+  if (trail.points.length >= 2) {
+    const mid = Math.floor(trail.points.length / 2);
+    const [lx, ly] = trail.points[mid];
+    ctx.font = '500 11px DM Mono, monospace';
+    ctx.fillStyle = '#0d0d0d';
+    ctx.textAlign = 'center';
+    ctx.fillText(trail.name, lx, ly - 10);
+  }
+}
+
+// ── INTERACTION ───────────────────────────────────────────────────────────
+function canvasCoord(e) {
+  const r = canvas.getBoundingClientRect();
+  return [e.clientX - r.left - offsetX, e.clientY - r.top - offsetY];
+}
+
+function trailHitTest(x, y, threshold = 10) {
+  for (let ti = trails.length - 1; ti >= 0; ti--) {
+    const trail = trails[ti];
+    for (let i = 1; i < trail.points.length; i++) {
+      const [ax, ay] = trail.points[i - 1];
+      const [bx, by] = trail.points[i];
+      const dx = bx - ax, dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      if (len2 === 0) continue;
+      let t = ((x - ax) * dx + (y - ay) * dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const px = ax + t * dx, py = ay + t * dy;
+      const dist = Math.hypot(x - px, y - py);
+      if (dist < threshold) return trail;
+    }
+  }
+  return null;
+}
+
+mapWrap.addEventListener('mousemove', e => {
+  const [cx, cy] = canvasCoord(e);
+  document.getElementById('coord-display').textContent =
+    `${Math.round(cx)}, ${Math.round(cy)}`;
+
+  if (mode === 'pan' && panStart) {
+    const dx = e.clientX - panStart[0];
+    const dy = e.clientY - panStart[1];
+    offsetX = targetOffsetX + dx;
+    offsetY = targetOffsetY + dy;
+    render();
+    return;
+  }
+
+  if (mode === 'select') {
+    const hit = trailHitTest(cx, cy);
+    mapWrap.style.cursor = hit ? 'pointer' : 'default';
+    const tooltip = document.getElementById('map-tooltip');
+    if (hit) {
+      tooltip.textContent = `${hit.name} · ${STATUS_LABELS[hit.status]}`;
+      tooltip.style.left = (e.clientX - mapWrap.getBoundingClientRect().left + 12) + 'px';
+      tooltip.style.top = (e.clientY - mapWrap.getBoundingClientRect().top - 30) + 'px';
+      tooltip.classList.add('visible');
+    } else {
+      tooltip.classList.remove('visible');
+    }
+  }
+
+  if (mode === 'draw' && isDrawing && drawPoints.length > 0) {
+    render();
+    // Draw preview line to cursor
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    const last = drawPoints[drawPoints.length - 1];
+    ctx.beginPath();
+    ctx.moveTo(last[0], last[1]);
+    ctx.lineTo(cx, cy);
+    ctx.strokeStyle = 'rgba(0,87,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+});
+
+mapWrap.addEventListener('mousedown', e => {
+  if (mode === 'pan') {
+    panStart = [e.clientX, e.clientY];
+    targetOffsetX = offsetX;
+    targetOffsetY = offsetY;
+  }
+});
+mapWrap.addEventListener('mouseup', () => { panStart = null; });
+
+mapWrap.addEventListener('click', e => {
+  const [cx, cy] = canvasCoord(e);
+
+  if (mode === 'select') {
+    const hit = trailHitTest(cx, cy);
+    if (hit) {
+      selectTrail(hit);
+    } else {
+      selectTrail(null);
+    }
+  }
+
+  if (mode === 'draw') {
+    if (!isDrawing) {
+      isDrawing = true;
+      document.getElementById('status-bar').textContent =
+        'Click to add points · Double-click to finish';
+      document.getElementById('status-bar').classList.add('visible');
+    }
+    drawPoints.push([cx, cy]);
+    render();
+  }
+});
+
+mapWrap.addEventListener('dblclick', e => {
+  if (mode === 'draw' && isDrawing) {
+    // Remove last point (dblclick fires two clicks)
+    if (drawPoints.length > 0) drawPoints.pop();
+    if (drawPoints.length >= 2) {
+      finishDrawing();
+    } else {
+      drawPoints = [];
+      isDrawing = false;
+      document.getElementById('status-bar').classList.remove('visible');
+      render();
+    }
+    e.preventDefault();
+  }
+});
+
+function finishDrawing() {
+  if (drawPoints.length < 2) return;
+  const pendingPoints = [...drawPoints];
+  drawPoints = [];
+  isDrawing = false;
+  document.getElementById('status-bar').classList.remove('visible');
+
+  // Switch to add tab with points stored
+  window._pendingPoints = pendingPoints;
+  showTab('add');
+  render();
+}
+
+// ── MODE ──────────────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-select').className =
+    'tool-btn' + (m === 'select' ? ' active' : '');
+  document.getElementById('btn-draw').className =
+    'tool-btn' + (m === 'draw' ? ' draw-active' : '');
+  document.getElementById('btn-pan').className =
+    'tool-btn' + (m === 'pan' ? ' active' : '');
+  mapWrap.className = 'map-wrap ' + (m === 'pan' ? 'pan-mode' : m === 'select' ? 'select-mode' : '');
+
+  if (m === 'draw') {
+    showTab('add');
+    document.getElementById('status-bar').textContent = 'Click on map to start drawing';
+    document.getElementById('status-bar').classList.add('visible');
+  } else {
+    if (!isDrawing) {
+      document.getElementById('status-bar').classList.remove('visible');
+    }
+    drawPoints = [];
+    isDrawing = false;
+    document.getElementById('map-tooltip').classList.remove('visible');
+  }
+}
+
+// ── TRAIL SELECTION ───────────────────────────────────────────────────────
+function selectTrail(trail) {
+  selectedTrail = trail;
+  render();
+  if (trail) {
+    showTab('report');
+    generateReport(trail);
+  } else {
+    showTab('trails');
+  }
+  renderPanel();
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────
+function showTab(tab) {
+  activeTab = tab;
+  ['trails','add','legend','report'].forEach(t => {
+    document.getElementById('tab-' + t).className =
+      'tab-btn' + (t === tab ? ' active' : '');
+  });
+  renderPanel();
+}
+
+function renderPanel() {
+  const el = document.getElementById('panel-content');
+  if (activeTab === 'trails') el.innerHTML = renderTrailList();
+  else if (activeTab === 'add') el.innerHTML = renderAddForm();
+  else if (activeTab === 'legend') el.innerHTML = renderLegend();
+  else if (activeTab === 'report') el.innerHTML = renderReportPane();
+}
+
+// ── TRAILS LIST ───────────────────────────────────────────────────────────
+function renderTrailList() {
+  if (!trails.length) return `<div class="empty-state"><span class="empty-state-icon">⛰</span>No trails yet.<br>Use Draw mode to add one.</div>`;
+  return trails.map(t => `
+    <div class="trail-card${selectedTrail?.id === t.id ? ' selected' : ''}"
+         onclick="selectTrail(trails.find(x=>x.id==='${t.id}'))">
+      <div class="trail-status-dot" style="background:${STATUS_COLORS[t.status]}"></div>
+      <div class="trail-card-name">${t.name}</div>
+      <div class="trail-card-meta">${t.difficulty} · ${t.length} · ${t.gain}</div>
+    </div>
+  `).join('');
+}
+
+// ── ADD FORM ──────────────────────────────────────────────────────────────
+function renderAddForm() {
+  const editing = selectedTrail && mode !== 'draw';
+  const t = editing ? selectedTrail : {};
+  const hasPoints = window._pendingPoints || (editing && t.points);
+  const pointCount = window._pendingPoints ? window._pendingPoints.length : (editing ? t.points.length : 0);
+
+  return `
+    <div class="section-label">${editing ? 'Edit Trail' : 'New Trail'}</div>
+    ${pointCount > 0 ? `<div style="font-size:0.65rem;letter-spacing:0.06em;opacity:0.6;margin-bottom:12px;padding:6px 10px;border:1px solid rgba(13,13,13,0.2);">
+      ${pointCount} waypoints ${window._pendingPoints ? 'drawn on map' : 'on record'}
+    </div>` : `<div style="font-size:0.65rem;letter-spacing:0.06em;opacity:0.5;margin-bottom:12px;">
+      Switch to <strong>Draw</strong> mode and click the map to place trail points, then double-click to finish.
+    </div>`}
+
+    <div class="form-field">
+      <label class="form-label">Trail Name</label>
+      <input class="form-input" id="f-name" value="${t.name || ''}" placeholder="e.g. Ridge Loop">
+    </div>
+    <div class="form-field">
+      <label class="form-label">Status</label>
+      <select class="form-select" id="f-status">
+        ${Object.entries(STATUS_LABELS).map(([v,l]) =>
+          `<option value="${v}"${(t.status || 'open') === v ? ' selected' : ''}>${l}</option>`
+        ).join('')}
+      </select>
+    </div>
+    <div class="form-field">
+      <label class="form-label">Difficulty</label>
+      <select class="form-select" id="f-diff">
+        ${['Easy','Moderate','Strenuous','Difficult'].map(d =>
+          `<option${(t.difficulty||'Moderate')===d?' selected':''}>${d}</option>`
+        ).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px">
+      <div class="form-field" style="flex:1">
+        <label class="form-label">Length</label>
+        <input class="form-input" id="f-length" value="${t.length || ''}" placeholder="4.2 mi">
+      </div>
+      <div class="form-field" style="flex:1">
+        <label class="form-label">Elev. Gain</label>
+        <input class="form-input" id="f-gain" value="${t.gain || ''}" placeholder="820 ft">
+      </div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">Field Notes</label>
+      <textarea class="form-textarea" id="f-notes" placeholder="Conditions, hazards, features...">${t.notes || ''}</textarea>
+    </div>
+    <button class="btn-primary" onclick="${editing ? 'saveEdit()' : 'saveNewTrail()'}">${editing ? 'Save Changes' : 'Add Trail'}</button>
+    ${editing ? `<button class="btn-danger" onclick="deleteTrail('${t.id}')">Delete Trail</button>` : ''}
+  `;
+}
+
+function saveNewTrail() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { alert('Please enter a trail name.'); return; }
+  const points = window._pendingPoints || [[200, 200], [250, 200]];
+  const trail = {
+    id: 't' + Date.now(),
+    name,
+    status: document.getElementById('f-status').value,
+    difficulty: document.getElementById('f-diff').value,
+    length: document.getElementById('f-length').value || '—',
+    gain: document.getElementById('f-gain').value || '—',
+    notes: document.getElementById('f-notes').value,
+    points
+  };
+  trails.push(trail);
+  window._pendingPoints = null;
+  setMode('select');
+  selectTrail(trail);
+}
+
+function saveEdit() {
+  if (!selectedTrail) return;
+  selectedTrail.name = document.getElementById('f-name').value.trim() || selectedTrail.name;
+  selectedTrail.status = document.getElementById('f-status').value;
+  selectedTrail.difficulty = document.getElementById('f-diff').value;
+  selectedTrail.length = document.getElementById('f-length').value || selectedTrail.length;
+  selectedTrail.gain = document.getElementById('f-gain').value || selectedTrail.gain;
+  selectedTrail.notes = document.getElementById('f-notes').value;
+  render();
+  showTab('trails');
+}
+
+function deleteTrail(id) {
+  if (!confirm('Delete this trail?')) return;
+  trails = trails.filter(t => t.id !== id);
+  selectedTrail = null;
+  render();
+  showTab('trails');
+  renderPanel();
+}
+
+// ── LEGEND ────────────────────────────────────────────────────────────────
+function renderLegend() {
+  return `
+    <div class="section-label">Trail Status</div>
+    ${Object.entries(STATUS_COLORS).map(([k,c]) => `
+      <div class="legend-item">
+        <div class="legend-line" style="background:${c};${k==='unmaintained'?'background:repeating-linear-gradient(90deg,'+c+' 0,'+c+' 8px,transparent 8px,transparent 14px)':''}"></div>
+        <span>${STATUS_LABELS[k]}</span>
+      </div>
+    `).join('')}
+    <hr class="divider">
+    <div class="section-label">How to Use</div>
+    <div style="font-size:0.68rem;line-height:1.8;opacity:0.8;">
+      <p style="margin-bottom:8px;"><strong>Select</strong> — Click a trail to see its report.</p>
+      <p style="margin-bottom:8px;"><strong>Draw</strong> — Click map points to create a trail. Double-click to finish.</p>
+      <p style="margin-bottom:8px;"><strong>Pan</strong> — Click and drag to move the map.</p>
+      <p><strong>Edit</strong> — Select a trail, then use the Add tab to edit its details.</p>
+    </div>
+    <hr class="divider">
+    <div class="section-label">Colors</div>
+    <div style="font-size:0.68rem;line-height:1.8;opacity:0.8;">
+      Contour lines show relative elevation. Major contours are darker. Grid dots mark 40px intervals.
+    </div>
+  `;
+}
+
+// ── REPORT ────────────────────────────────────────────────────────────────
+let reportCache = {};
+let currentReportId = null;
+
+function renderReportPane() {
+  if (!selectedTrail) {
+    return `<div class="empty-state"><span class="empty-state-icon">🗺</span>Select a trail on<br>the map to view its report.</div>`;
+  }
+  const t = selectedTrail;
+  const cached = reportCache[t.id];
+  const color = STATUS_COLORS[t.status];
+
+  return `
+    <div class="report-wrap">
+      <h3>${t.name}</h3>
+      <span class="report-status-badge" style="background:${color}">${STATUS_LABELS[t.status]}</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">
+        <div style="font-size:0.65rem;letter-spacing:0.06em;padding:6px 10px;border:1px solid rgba(13,13,13,0.15);">
+          <div style="opacity:0.5;margin-bottom:2px;">Difficulty</div>
+          <div>${t.difficulty || '—'}</div>
+        </div>
+        <div style="font-size:0.65rem;letter-spacing:0.06em;padding:6px 10px;border:1px solid rgba(13,13,13,0.15);">
+          <div style="opacity:0.5;margin-bottom:2px;">Length</div>
+          <div>${t.length || '—'}</div>
+        </div>
+        <div style="font-size:0.65rem;letter-spacing:0.06em;padding:6px 10px;border:1px solid rgba(13,13,13,0.15);">
+          <div style="opacity:0.5;margin-bottom:2px;">Elev. Gain</div>
+          <div>${t.gain || '—'}</div>
+        </div>
+        <div style="font-size:0.65rem;letter-spacing:0.06em;padding:6px 10px;border:1px solid rgba(13,13,13,0.15);">
+          <div style="opacity:0.5;margin-bottom:2px;">Waypoints</div>
+          <div>${t.points.length}</div>
+        </div>
+      </div>
+
+      ${t.notes ? `
+        <div class="report-section-title">Field Notes</div>
+        <div class="report-body">${t.notes}</div>
+      ` : ''}
+
+      <div class="report-section-title">AI Trail Report</div>
+      <div id="ai-report-content">
+        ${cached
+          ? `<div class="report-body">${cached}</div>
+             <button class="tool-btn" style="margin-top:10px;font-size:0.6rem;" onclick="generateReport(selectedTrail, true)">Regenerate</button>`
+          : `<div class="report-loading"><div class="spinner"></div>Generating report...</div>`
+        }
+      </div>
+
+      <hr class="divider">
+      <button class="tool-btn" style="width:100%;margin-top:4px;" onclick="showTab('add')">Edit Trail Details</button>
+    </div>
+  `;
+}
+
+async function generateReport(trail, force = false) {
+  if (!trail) return;
+  currentReportId = trail.id;
+
+  if (reportCache[trail.id] && !force) {
+    renderPanel();
+    return;
+  }
+
+  renderPanel(); // show loading state
+
+  const prompt = `You are a trail conditions reporter for a wilderness area. Generate a concise, practical trail report for the following trail. Write 2-3 short paragraphs covering: current conditions based on the status, what hikers should expect, and any recommendations. Keep it grounded and useful, like something you'd read on a trail app.
+
+Trail name: ${trail.name}
+Status: ${STATUS_LABELS[trail.status]}
+Difficulty: ${trail.difficulty}
+Length: ${trail.length}
+Elevation gain: ${trail.gain}
+Field notes: ${trail.notes || 'None provided.'}
+
+Write the report in plain text, no headers or markdown. Be specific and helpful.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || 'Report unavailable.';
+
+    if (currentReportId === trail.id) {
+      reportCache[trail.id] = text;
+      const el = document.getElementById('ai-report-content');
+      if (el) {
+        el.innerHTML = `<div class="report-body">${text.replace(/\n\n/g,'</div><div class="report-body" style="margin-top:8px;">')}</div>
+          <button class="tool-btn" style="margin-top:10px;font-size:0.6rem;" onclick="generateReport(selectedTrail, true)">Regenerate</button>`;
+      }
+    }
+  } catch (err) {
+    const el = document.getElementById('ai-report-content');
+    if (el) el.innerHTML = `<div style="font-size:0.7rem;opacity:0.6;">Report generation failed. Check API connection.</div>`;
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+resize();
+showTab('trails');
+renderPanel();
+</script>
+</body>
+</html>

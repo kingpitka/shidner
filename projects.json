@@ -9,4 +9,15 @@
     "embed_url": "",
     "long_description": "Every lab needs a starting point. This is it."
   }
+,
+  {
+  "slug":             "topo-trails",
+  "title":            "Topo Trail Map",
+  "description":      "Interactive topographic map with AI-generated trail condition reports.",
+  "tags":             ["claude", "maps", "outdoors"],
+  "date":             "2025",
+  "status":           "Live",
+  "embed_url":        "projects/topo-trails/index.html",
+  "long_description": "Draw trails on a topo map, assign status (open/caution/closed/unmaintained), and click any trail to generate an AI condition report."
+}
 ]
